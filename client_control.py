@@ -13,7 +13,9 @@ if __name__ == "__main__":
         action[0] = 1
         events = pygame.event.get()
         for event in events:
-            if event.type == pygame.KEYDOWN:
+            if event.type == pygame.QUIT:
+               sys.exit()
+            elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
                     action[0] = 0
                     action[1] = 1
