@@ -6,7 +6,7 @@ sys.path.append("game/")
 import wrapped_flappy_bird as game
 
 if __name__ == "__main__":
-    game_state = game.GameState()
+    game_state = game.GameState(1, True)
     R = 0
     while(1):
         action = np.zeros(2)

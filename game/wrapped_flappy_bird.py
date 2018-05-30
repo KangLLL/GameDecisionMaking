@@ -30,7 +30,10 @@ PLAYER_INDEX_GEN = cycle([0, 1, 2, 1])
 
 
 class GameState:
-    def __init__(self):
+    def __init__(self, rand_seed, is_show_score=False):
+        self.rand_seed = rand_seed
+        random.seed(rand_seed)
+        self.is_show_score = is_show_score
         self.score = self.playerIndex = self.loopIter = 0
         self.playerx = int(SCREENWIDTH * 0.2)
         self.playery = int((SCREENHEIGHT - PLAYER_HEIGHT) / 2)
@@ -122,7 +125,7 @@ class GameState:
             #SOUNDS['hit'].play()
             #SOUNDS['die'].play()
             terminal = True
-            self.__init__()
+            self.__init__(self.rand_seed, self.is_show_score)
             reward = -1
 
         # draw sprites
@@ -133,13 +136,20 @@ class GameState:
             SCREEN.blit(IMAGES['pipe'][1], (lPipe['x'], lPipe['y']))
 
         SCREEN.blit(IMAGES['base'], (self.basex, BASEY))
-        # print score so player overlaps the score
-        showScore(self.score)
+
         SCREEN.blit(IMAGES['player'][self.playerIndex],
                     (self.playerx, self.playery))
 
         image_data = pygame.surfarray.array3d(pygame.display.get_surface())
+
+        if self.is_show_score:
+            # print score so player overlaps the score
+            showScore(self.score)
         pygame.display.update()
+
+        if self.is_show_score:
+            self.full_frame = pygame.surfarray.array3d(pygame.display.get_surface())
+
         FPSCLOCK.tick(FPS)
         #print self.upperPipes[0]['y'] + PIPE_HEIGHT - int(BASEY * 0.2)
         return image_data, reward, terminal
