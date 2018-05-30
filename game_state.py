@@ -9,7 +9,6 @@ import random
 import time
 import cv2
 
-
 class GameState(object):
     def __init__(self, action_size, rand_seed=0, is_show_score=False):
         self.rand_seed = rand_seed
@@ -74,3 +73,4 @@ class GameState(object):
     def update(self):
         self.s_t = self.s_t1
         self.steps += 1
+

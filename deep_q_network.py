@@ -5,84 +5,57 @@ import tensorflow as tf
 import cv2
 import sys
 
-sys.path.append("game/")
-import wrapped_flappy_bird as game
 import random
 import numpy as np
 import config
+import nn_factory as fac
+from game_state import GameState
 from collections import deque
 
 settings = tf.app.flags.FLAGS
 
-def weight_variable(shape):
-    initial = tf.truncated_normal(shape, stddev=0.01)
-    return tf.Variable(initial)
-
-
-def bias_variable(shape):
-    initial = tf.constant(0.01, shape=shape)
-    return tf.Variable(initial)
-
-
-def conv2d(x, W, stride):
-    return tf.nn.conv2d(x, W, strides=[1, stride, stride, 1], padding="SAME")
-
-
-def max_pool_2x2(x):
-    return tf.nn.max_pool(x, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding="SAME")
-
-
-def createNetwork():
+def create_network():
     # network weights
-    W_conv1 = weight_variable([8, 8, 4, 32])
-    b_conv1 = bias_variable([32])
-
-    W_conv2 = weight_variable([4, 4, 32, 64])
-    b_conv2 = bias_variable([64])
-
-    W_conv3 = weight_variable([3, 3, 64, 64])
-    b_conv3 = bias_variable([64])
-
-    W_fc1 = weight_variable([1600, 512])
-    b_fc1 = bias_variable([512])
-
-    W_fc2 = weight_variable([512, settings.action])
-    b_fc2 = bias_variable([settings.action])
-
-    # input layer
-    s = tf.placeholder("float", [None, 80, 80, 4])
-
-    # hidden layers
-    h_conv1 = tf.nn.relu(conv2d(s, W_conv1, 4) + b_conv1)
-    h_pool1 = max_pool_2x2(h_conv1)
-
-    h_conv2 = tf.nn.relu(conv2d(h_pool1, W_conv2, 2) + b_conv2)
-    # h_pool2 = max_pool_2x2(h_conv2)
-
-    h_conv3 = tf.nn.relu(conv2d(h_conv2, W_conv3, 1) + b_conv3)
-    # h_pool3 = max_pool_2x2(h_conv3)
-
-    # h_pool3_flat = tf.reshape(h_pool3, [-1, 256])
-    h_conv3_flat = tf.reshape(h_conv3, [-1, 1600])
-
-    h_fc1 = tf.nn.relu(tf.matmul(h_conv3_flat, W_fc1) + b_fc1)
+    s, h_fc1 = fac.build_conv_network()
+    W_fc2, b_fc2 = fac.fc_variable([256, settings.action])
 
     # readout layer
-    readout = tf.matmul(h_fc1, W_fc2) + b_fc2
+    q_out = tf.matmul(h_fc1, W_fc2) + b_fc2
+    return s, q_out
 
-    return s, readout, h_fc1
-
-
-def trainNetwork(s, readout, h_fc1, sess):
-    # define the cost function
+def prepare_loss(q_out):
     a = tf.placeholder("float", [None, settings.action])
     y = tf.placeholder("float", [None])
-    readout_action = tf.reduce_sum(tf.multiply(readout, a), reduction_indices=1)
+    readout_action = tf.reduce_sum(tf.multiply(q_out, a), reduction_indices=1)
     cost = tf.reduce_mean(tf.square(y - readout_action))
     train_step = tf.train.AdamOptimizer(1e-6).minimize(cost)
 
+    return y, a, train_step
+
+def restore_file(sess, saver):
+    checkpoint = tf.train.get_checkpoint_state("saved_networks/dqn")
+
+    t = 0
+    if checkpoint and checkpoint.model_checkpoint_path:
+        saver.restore(sess, checkpoint.model_checkpoint_path)
+
+        tokens = checkpoint.model_checkpoint_path.split("-")
+        t = int(tokens[2])
+
+        print(checkpoint.model_checkpoint_path)
+        print("Successfully loaded:", checkpoint.model_checkpoint_path)
+    else:
+        sess.run(tf.global_variables_initializer())
+        print("Could not find old network weights")
+
+    return t
+
+def train_network(s, q_out, sess):
+    # define the cost function
+    y, a, train_step = prepare_loss(q_out)
+
     # open up a game state to communicate with emulator
-    game_state = game.GameState()
+    game_state = GameState(settings.action)
 
     # store the previous observations in replay memory
     D = deque()
@@ -91,65 +64,38 @@ def trainNetwork(s, readout, h_fc1, sess):
     a_file = open("logs_" + settings.game + "/readout.txt", 'w')
     h_file = open("logs_" + settings.game + "/hidden.txt", 'w')
 
-    # get the first state by doing nothing and preprocess the image to 80x80x4
-    do_nothing = np.zeros(settings.action)
-    do_nothing[0] = 1
-    x_t, r_0, terminal = game_state.frame_step(do_nothing)
-    x_t = cv2.cvtColor(cv2.resize(x_t, (80, 80)), cv2.COLOR_BGR2GRAY)
-    ret, x_t = cv2.threshold(x_t, 1, 255, cv2.THRESH_BINARY)
-    s_t = np.stack((x_t, x_t, x_t, x_t), axis=2)
-
     # saving and loading networks
     saver = tf.train.Saver()
-    sess.run(tf.initialize_all_variables())
-    checkpoint = tf.train.get_checkpoint_state("saved_networks/dqn")
-    if checkpoint and checkpoint.model_checkpoint_path:
-        saver.restore(sess, checkpoint.model_checkpoint_path)
-        print(checkpoint.model_checkpoint_path)
-        print("Successfully loaded:", checkpoint.model_checkpoint_path)
-    else:
-        print("Could not find old network weights")
+    t = restore_file(sess, saver)
 
     # start training
     epsilon = settings.initial_epsilon
-    t = 0
     while True:
         # choose an action epsilon greedily
-        readout_t = readout.eval(feed_dict={s: [s_t]})[0]
+        readout_t = q_out.eval(feed_dict={s: [game_state.s_t]})[0]
 
-        a_t = np.zeros([settings.action])
-        action_index = 0
+        action = 0
         if t % settings.frame_per_action == 0:
             if random.random() <= epsilon:
                 print("----------Random Action----------")
-                action_index = random.randrange(settings.action)
-                a_t[random.randrange(settings.action)] = 1
+                action = random.randrange(settings.action)
             else:
-                action_index = np.argmax(readout_t)
-                a_t[action_index] = 1
-        else:
-            a_t[0] = 1  # do nothing
+                action = np.argmax(readout_t)
 
         # scale down epsilon
         if epsilon > settings.final_epsilon and t > settings.observe:
             epsilon -= (settings.initial_epsilon - settings.final_epsilon) / settings.explore
 
         # run the selected action and observe next state and reward
-        x_t1_colored, r_t, terminal = game_state.frame_step(a_t)
-        x_t1 = cv2.cvtColor(cv2.resize(x_t1_colored, (80, 80)), cv2.COLOR_BGR2GRAY)
-        ret, x_t1 = cv2.threshold(x_t1, 1, 255, cv2.THRESH_BINARY)
-        x_t1 = np.reshape(x_t1, (80, 80, 1))
-        # s_t1 = np.append(x_t1, s_t[:,:,1:], axis = 2)
-        s_t1 = np.append(x_t1, s_t[:, :, :3], axis=2)
+        game_state.process(action)
 
         # store the transition in D
-        D.append((s_t, a_t, r_t, s_t1, terminal))
+        D.append((game_state.s_t, game_state.vectorize_action(action), game_state.reward, game_state.s_t1, game_state.terminal))
         if len(D) > settings.replay_memory:
             D.popleft()
 
         # only train if done observing
-        # if t > config.OBSERVE:
-        if t > 60:
+        if t > config.OBSERVE:
             # sample a minibatch to train on
             minibatch = random.sample(D, settings.batch)
 
@@ -160,7 +106,7 @@ def trainNetwork(s, readout, h_fc1, sess):
             s_j1_batch = [d[3] for d in minibatch]
 
             y_batch = []
-            readout_j1_batch = readout.eval(feed_dict = {s : s_j1_batch})
+            readout_j1_batch = q_out.eval(feed_dict = {s : s_j1_batch})
             for i in range(0, len(minibatch)):
                 terminal = minibatch[i][4]
                 # if terminal, only equals reward
@@ -176,10 +122,6 @@ def trainNetwork(s, readout, h_fc1, sess):
                 s: s_j_batch}
             )
 
-        # update the old values
-        s_t = s_t1
-        t += 1
-
         # save progress every 10000 iterations
         if t % 10000 == 0:
             saver.save(sess, 'saved_networks/dqn/' + settings.game + '-dqn', global_step=t)
@@ -194,8 +136,13 @@ def trainNetwork(s, readout, h_fc1, sess):
             state = "train"
 
         print("TIMESTEP", t, "/ STATE", state, \
-              "/ EPSILON", epsilon, "/ ACTION", action_index, "/ REWARD", r_t, \
+              "/ EPSILON", epsilon, "/ ACTION", action, "/ REWARD", game_state.reward, \
               "/ Q_MAX %e" % np.max(readout_t))
+
+        # update the old values
+        game_state.update()
+        t += 1
+
         # write info to files
         '''
         if t % 10000 <= 100:
@@ -207,12 +154,8 @@ def trainNetwork(s, readout, h_fc1, sess):
 
 def playGame():
     sess = tf.InteractiveSession()
-
-    # with tf.Graph().as_default() as net1:
-    s, readout, h_fc1 = createNetwork()
-    # sess = tf.Session(graph=net1)
-    trainNetwork(s, readout, h_fc1, sess)
-
+    s, q_out = create_network()
+    train_network(s, q_out, sess)
 
 def main():
     playGame()
