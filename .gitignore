@@ -1,5 +1,6 @@
 .DS_Store
 *.pyc
 .idea/
+saved_networks/
 test.py
 test1.py
