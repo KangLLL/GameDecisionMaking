@@ -50,7 +50,7 @@ class GameState(object):
         self.steps = 1
         self.passed_obst = 0
 
-        x_t, _, _ = self._process_frame(0, False)
+        x_t, _, _ = self._process_frame(self.vectorize_action(0), False)
 
         self.reward = 0
         self.terminal = False
