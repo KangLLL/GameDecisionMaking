@@ -26,7 +26,7 @@ def _conv_variable(weight_shape):
     bias = tf.Variable(tf.random_uniform(bias_shape, minval=-d, maxval=d))
     return weight, bias
 
-def _conv2d(self, x, W, stride):
+def _conv2d(x, W, stride):
     return tf.nn.conv2d(x, W, strides=[1, stride, stride, 1], padding="VALID")
 
 def build_conv_network():
