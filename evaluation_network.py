@@ -6,11 +6,13 @@ import config
 import wrapped_flappy_bird as game
 
 from tensorflow.python.tools import inspect_checkpoint as chkp
+import config
 
+settings = tf.app.flags.FLAGS
 
 def evaluateNetwork(s, readout, h_fc1, sess, evaluate_model_path):
     # define the cost function
-    a = tf.placeholder("float", [None, config.ACTIONS])
+    a = tf.placeholder("float", [None, settings.action])
 
     # open up a game state to communicate with emulator
     game_state = game.GameState()
@@ -20,7 +22,7 @@ def evaluateNetwork(s, readout, h_fc1, sess, evaluate_model_path):
     # h_file = open("logs_" + config.GAME + "/hidden.txt", 'w')
 
     # get the first state by doing nothing and preprocess the image to 80x80x4
-    do_nothing = np.zeros(config.ACTIONS)
+    do_nothing = np.zeros(settings.action)
     do_nothing[0] = 1
     x_t, r_0, terminal = game_state.frame_step(do_nothing)
     x_t = cv2.cvtColor(cv2.resize(x_t, (80, 80)), cv2.COLOR_BGR2GRAY)
@@ -40,12 +42,12 @@ def evaluateNetwork(s, readout, h_fc1, sess, evaluate_model_path):
     # start evaluating
     episode = 0
     t = 0
-    while episode < config.EVALUATE_EPISODES:
+    while episode < settings.evaluate_iterations:
         readout_t = readout.eval(feed_dict={s : [s_t]})[0]
-        a_t = np.zeros([config.ACTIONS])
+        a_t = np.zeros([settings.action])
         action_index = 0
 
-        if t % config.FRAME_PER_ACTION == 0:
+        if t % settings.frame_per_action == 0:
             action_index = np.argmax(readout_t)
             a_t[action_index] = 1
         else:
@@ -69,9 +71,9 @@ def evaluateNetwork(s, readout, h_fc1, sess, evaluate_model_path):
 def evaluate():
     session = tf.InteractiveSession()
     s, readout, h_fc1 = dqn.createNetwork()
-    # evaluateNetwork(s, readout, h_fc1, session, "saved_networks/bird-dqn-110000")
+    evaluateNetwork(s, readout, h_fc1, session, "saved_networks/bird-dqn-130000")
 
-    evaluateNetwork(s, readout, h_fc1, session, "")
+    # evaluateNetwork(s, readout, h_fc1, session, "")
 
 if __name__ == "__main__":
     evaluate()
