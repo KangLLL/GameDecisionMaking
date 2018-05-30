@@ -11,7 +11,7 @@ import cv2
 
 
 class GameState(object):
-    def __init__(self, rand_seed, action_size, is_show_score=False):
+    def __init__(self, action_size, rand_seed=0, is_show_score=False):
         self.rand_seed = rand_seed
         random.seed(self.rand_seed)
         self.action_size = action_size
