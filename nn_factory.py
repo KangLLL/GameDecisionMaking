@@ -48,7 +48,7 @@ def build_conv_network():
     return s, h_fc1
 
 def restore_file(sess, saver, method_name):
-    checkpoint = tf.train.get_checkpoint_state("saved_networks/" + method_name)
+    checkpoint = tf.train.get_checkpoint_state(settings.model_dir + "/" + method_name)
 
     t = 0
     if checkpoint and checkpoint.model_checkpoint_path:

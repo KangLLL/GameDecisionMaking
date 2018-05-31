@@ -26,12 +26,12 @@ def _create_network(network_name, output_dimension):
 
 def create_network():
     # build actor network
-    s_actor, readout_actor, _ = _create_network("actor", settings.action)
+    s_actor, readout_actor = _create_network("actor", settings.action)
     with tf.variable_scope("actor"):
         out_actor = tf.clip_by_value(tf.nn.softmax(readout_actor), 1e-20, 1.0)
 
     # build critic network
-    s_critic, readout_critic, _ = _create_network("critic", 1)
+    s_critic, readout_critic = _create_network("critic", 1)
     return s_actor, out_actor, s_critic, readout_critic
 
 def trainCritic(out_critic):
@@ -72,7 +72,7 @@ def train_network(s_actor, out_actor, s_critic, out_critic, sess):
     while True:
         # choose an action with probability
         probs = sess.run(out_actor, {s_actor: [game_state.s_t]})[0]  # get probabilities for all actions
-        action = np.random.choice(np.arange(probs.shape[1]), p=probs.ravel())  # return a int
+        action = np.random.choice(range(len(probs)), p=probs)  # return a int
 
         # run the selected action and observe next state and reward
         game_state.process(action)
@@ -125,7 +125,7 @@ def train_network(s_actor, out_actor, s_critic, out_critic, sess):
 
         # save progress every 10000 iterations
         if t % 10000 == 0:
-            saver.save(sess, "saved_networks/" + settings.ac_name + "/" + settings.game + "-dqn", global_step=t)
+            saver.save(sess, settings.model_dir + "/" + settings.ac_name + "/" + settings.game + "-dqn", global_step=t)
 
         # print info
         print("TIMESTEP", t, "/ ACTION", action, "/ REWARD", game_state.reward, \
