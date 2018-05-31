@@ -23,6 +23,7 @@ def create_network():
     q_out = tf.matmul(h_fc1, W_fc2) + b_fc2
     return s, q_out
 
+
 def prepare_loss(q_out):
     a = tf.placeholder("float", [None, settings.action])
     y = tf.placeholder("float", [None])
@@ -32,23 +33,6 @@ def prepare_loss(q_out):
 
     return y, a, train_step
 
-def restore_file(sess, saver):
-    checkpoint = tf.train.get_checkpoint_state("saved_networks/dqn")
-
-    t = 0
-    if checkpoint and checkpoint.model_checkpoint_path:
-        saver.restore(sess, checkpoint.model_checkpoint_path)
-
-        tokens = checkpoint.model_checkpoint_path.split("-")
-        t = int(tokens[2])
-
-        print(checkpoint.model_checkpoint_path)
-        print("Successfully loaded:", checkpoint.model_checkpoint_path)
-    else:
-        sess.run(tf.global_variables_initializer())
-        print("Could not find old network weights")
-
-    return t
 
 def train_network(s, q_out, sess):
     # define the cost function
@@ -60,13 +44,9 @@ def train_network(s, q_out, sess):
     # store the previous observations in replay memory
     D = deque()
 
-    # printing
-    a_file = open("logs_" + settings.game + "/readout.txt", 'w')
-    h_file = open("logs_" + settings.game + "/hidden.txt", 'w')
-
     # saving and loading networks
     saver = tf.train.Saver()
-    t = restore_file(sess, saver)
+    t = fac.restore_file(sess, saver, settings.dqn_name)
 
     # start training
     epsilon = settings.initial_epsilon
@@ -90,7 +70,8 @@ def train_network(s, q_out, sess):
         game_state.process(action)
 
         # store the transition in D
-        D.append((game_state.s_t, game_state.vectorize_action(action), game_state.reward, game_state.s_t1, game_state.terminal))
+        D.append((game_state.s_t, game_state.vectorize_action(action), game_state.reward, game_state.s_t1,
+                  game_state.terminal))
         if len(D) > settings.replay_memory:
             D.popleft()
 
@@ -106,7 +87,7 @@ def train_network(s, q_out, sess):
             s_j1_batch = [d[3] for d in minibatch]
 
             y_batch = []
-            readout_j1_batch = q_out.eval(feed_dict = {s : s_j1_batch})
+            readout_j1_batch = q_out.eval(feed_dict={s: s_j1_batch})
             for i in range(0, len(minibatch)):
                 terminal = minibatch[i][4]
                 # if terminal, only equals reward
@@ -124,7 +105,7 @@ def train_network(s, q_out, sess):
 
         # save progress every 10000 iterations
         if t % 10000 == 0:
-            saver.save(sess, 'saved_networks/dqn/' + settings.game + '-dqn', global_step=t)
+            saver.save(sess, "saved_networks/" + settings.dqn_name + "/" + settings.game + "-dqn", global_step=t)
 
         # print info
         state = ""
@@ -143,19 +124,12 @@ def train_network(s, q_out, sess):
         game_state.update()
         t += 1
 
-        # write info to files
-        '''
-        if t % 10000 <= 100:
-            a_file.write(",".join([str(x) for x in readout_t]) + '\n')
-            h_file.write(",".join([str(x) for x in h_fc1.eval(feed_dict={s:[s_t]})[0]]) + '\n')
-            cv2.imwrite("logs_tetris/frame" + str(t) + ".png", x_t1)
-        '''
-
 
 def playGame():
     sess = tf.InteractiveSession()
     s, q_out = create_network()
     train_network(s, q_out, sess)
+
 
 def main():
     playGame()

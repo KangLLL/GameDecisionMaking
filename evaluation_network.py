@@ -1,80 +1,150 @@
 import tensorflow as tf
 import numpy as np
-import cv2
+import config
+import random
+import time
+import matplotlib.pyplot as plt
+import sys
 import deep_q_network as dqn
-import config
-import wrapped_flappy_bird as game
+import actor_critic_network as acn
 
-from tensorflow.python.tools import inspect_checkpoint as chkp
-import config
+np.set_printoptions(threshold='nan')
+from game_state import GameState
 
 settings = tf.app.flags.FLAGS
 
-def evaluateNetwork(s, readout, h_fc1, sess, evaluate_model_path):
-    # define the cost function
-    a = tf.placeholder("float", [None, settings.action])
+def initialize_network(sess, method, file_name):
+    if method == 0:
+        s, out = dqn.create_network()
+        method_name = settings.dpn_name
+        result = (s, out)
+    elif method == 1:
+        s_a, o_a, s_c, o_c = acn.create_network()
+        method_name = settings.acn_name
+        result = (s_a, o_a, s_c, o_c)
 
-    # open up a game state to communicate with emulator
-    game_state = game.GameState()
-
-    # printing
-    # a_file = open("logs_" + config.GAME + "/readout.txt", 'w')
-    # h_file = open("logs_" + config.GAME + "/hidden.txt", 'w')
-
-    # get the first state by doing nothing and preprocess the image to 80x80x4
-    do_nothing = np.zeros(settings.action)
-    do_nothing[0] = 1
-    x_t, r_0, terminal = game_state.frame_step(do_nothing)
-    x_t = cv2.cvtColor(cv2.resize(x_t, (80, 80)), cv2.COLOR_BGR2GRAY)
-    ret, x_t = cv2.threshold(x_t,1,255,cv2.THRESH_BINARY)
-    s_t = np.stack((x_t, x_t, x_t, x_t), axis=2)
-
-    # saving and loading networks
     saver = tf.train.Saver()
-    if evaluate_model_path:
-        saver.restore(sess, evaluate_model_path)
-        # chkp.print_tensors_in_checkpoint_file(evaluate_model_path, tensor_name="", all_tensors=True)
-        print("Successfully loaded:", evaluate_model_path)
-    else:
-        sess.run(tf.global_variables_initializer())
-        print("Could not find evaluate network weights")
 
-    # start evaluating
+    model_file_name = settings.model_dir + '/' + method_name + '/' + file_name
+    saver.restore(sess, model_file_name)
+    print('Successfully loaded:', model_file_name)
+
+    return result
+
+
+def choose_action(method, sess, s, out, s_values):
+    if method == 0:
+        q_values = sess.run(out, {s: [s_values]})[0]
+        return np.argmax(q_values)
+    elif method == 1:
+        probs = sess.run(out, {s: [s_values]})[0]
+        return np.random.choice(range(len(probs)), p=probs)
+    return 0
+
+
+def display(t, method, rand_seed, s, o):
+    log_file_path = 'log_{}.txt'.format(t)
+    if method == 0:
+        log_file_path = settings.model_dir + '/' + settings.dpn_name + '/' + log_file_path
+    elif method == 1:
+        log_file_path = settings.model_dir + '/' + settings.acn_name + '/' + log_file_path
+
     episode = 0
-    t = 0
-    while episode < settings.evaluate_iterations:
-        readout_t = readout.eval(feed_dict={s : [s_t]})[0]
-        a_t = np.zeros([settings.action])
-        action_index = 0
+    terminal = False
 
-        if t % settings.frame_per_action == 0:
-            action_index = np.argmax(readout_t)
-            a_t[action_index] = 1
-        else:
-            a_t[0] = 1 # do nothing
+    episode_rewards = []
+    episode_steps = []
+    episode_passed_obsts = []
+    print ' '
+    print 'DISPLAYING {} EPISODES'.format(settings.evaluate_episodes)
+    print '--------------------------------------------------- '
 
-        # run the selected action and observe next state and reward
-        x_t1_colored, r_t, terminal = game_state.frame_step(a_t)
-        x_t1 = cv2.cvtColor(cv2.resize(x_t1_colored, (80, 80)), cv2.COLOR_BGR2GRAY)
-        ret, x_t1 = cv2.threshold(x_t1, 1, 255, cv2.THRESH_BINARY)
-        x_t1 = np.reshape(x_t1, (80, 80, 1))
-        #s_t1 = np.append(x_t1, s_t[:,:,1:], axis = 2)
-        s_t = np.append(x_t1, s_t[:, :, :3], axis=2)
+    while not episode == settings.evaluate_episodes:
+        episode_reward = 0
+        episode_passed_obst = 0
 
-        # update the old values
-        if terminal:
-            t = 0
-            episode += 1
-        else:
-            t += 1
+        game_state = GameState(rand_seed, settings.action, show_score=True)
+        print 'EPISODE {}'.format(episode)
 
-def evaluate():
-    session = tf.InteractiveSession()
-    s, readout, h_fc1 = dqn.createNetwork()
-    evaluateNetwork(s, readout, h_fc1, session, "saved_networks/bird-dqn-130000")
+        full_frame = None
+        while True:
+            action = choose_action(method, sess, s, o, game_state.s_t)
+            game_state.process(action)
+            terminal = game_state.terminal
+            episode_step = game_state.steps
+            reward = game_state.reward
+            passed_obst = game_state.passed_obst
+            if len(episode_passed_obsts) == 0:
+                if passed_obst > 0:
+                    full_frame = game_state.full_frame
+            elif episode_passed_obst > np.max(episode_passed_obsts):
+                full_frame = game_state.full_frame
 
-    # evaluateNetwork(s, readout, h_fc1, session, "")
+            episode_reward += reward
+            episode_passed_obst = passed_obst
 
-if __name__ == "__main__":
-    evaluate()
-    print("evaluate")
+            if not terminal:
+                game_state.update()
+            else:
+                break
+
+        episode_rewards.append(episode_reward)
+        episode_steps.append(episode_step)
+        episode_passed_obsts.append(episode_passed_obst)
+
+        reward_steps = format(float(episode_reward) / float(episode_step), '.4f')
+        print "EPISODE: {}  /  STEPS: {}  /  PASSED OBST: {}  /  REWARD: {}  /  REWARD/STEP: {}".format(episode,
+                                                                                                        episode_step,
+                                                                                                        passed_obst,
+                                                                                                        episode_reward,
+                                                                                                        reward_steps)
+
+        with open(log_file_path, "a") as text_file:
+            text_file.write(
+                '{},{},{},{},{}\n'.format(episode, episode_step, passed_obst, episode_reward, reward_steps))
+
+        episode += 1
+
+    print '--------------------------------------------------- '
+    print 'DISPLAY SESSION FINISHED'
+    print 'TOTAL EPISODES: {}'.format(settings.evaluate_episodes)
+    print ' '
+    print 'MIN'
+    print 'REWARD: {}  /  STEPS: {}  /  PASSED OBST: {}'.format(np.min(episode_rewards), np.min(episode_steps),
+                                                                np.min(episode_passed_obsts))
+    print ' '
+    print 'AVERAGE'
+    print  'REWARD: {}  /  STEPS: {}  /  PASSED OBST: {}'.format(np.average(episode_rewards), np.average(episode_steps),
+                                                                 np.average(episode_passed_obsts))
+    print ' '
+    print 'MAX'
+    print 'REWARD: {}  /   STEPS: {}  /   PASSED OBST: {}'.format(np.max(episode_rewards), np.max(episode_steps),
+                                                                  np.max(episode_passed_obsts))
+
+    print ' '
+    print 'AVERAGE_REWARD'
+    print 'REWARD: {}  /  PASSED OBST: {}'.format(np.sum(episode_rewards) / settings.evaluate_episodes,
+                                                  np.sum(episode_passed_obsts) / settings.evaluate_episodes)
+
+    with open(log_file_path, "a") as text_file:
+        text_file.write(
+            '{},{}\n'.format(np.sum(episode_rewards) / settings.evaluate_episodes,
+                             np.sum(episode_passed_obsts) / settings.evaluate_episodes))
+
+
+if __name__ == '__main__':
+    method = 0  # 0: dpn 1: ac
+    t = 10000
+    if len(sys.argv) > 1:
+        method = int(sys.argv[1])
+    if len(sys.argv) > 2:
+        t = int(sys.argv[2])
+    file_name = settings.game + '-' + method + '-' + str(t)
+
+    sess = tf.Session()
+    if method == 0:
+        s, o = initialize_network(sess, method, file_name)
+    else:
+        s, o, _, _ = initialize_network(sess, method, file_name)
+
+    display(t, method, 1, s, o)

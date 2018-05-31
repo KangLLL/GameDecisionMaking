@@ -12,7 +12,11 @@ flags.DEFINE_float('initial_epsilon', 0.0001, 'starting value of epsilon')
 flags.DEFINE_integer('replay_memory', 50000, 'number of transitions to remember')
 flags.DEFINE_integer('batch', 32, 'size of minibatch')
 flags.DEFINE_integer('frame_per_action', 1, 'the minimum interval frames between two actions')
-flags.DEFINE_integer('evaluate_iterations', 10000, 'number of iterations for each checkpoint')
 
+flags.DEFINE_integer('evaluate_episodes', 10000, 'number of iterations for each checkpoint')
+
+flags.DEFINE_string('model_dir', 'saved_networks', 'the name used for the parent directory')
+flags.DEFINE_string('dpn_name', 'dqn', 'the name used for the dqn model directory')
+flags.DEFINE_string('ac_name', 'acn', 'the name used for the actor_critic model directory')
 
 flags.DEFINE_integer('random_seed', 1, 'Random seed to use during training')

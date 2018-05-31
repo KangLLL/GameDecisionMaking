@@ -46,3 +46,21 @@ def build_conv_network():
     h_fc1 = tf.nn.relu(tf.matmul(h_conv2_flat, W_fc1) + b_fc1)
 
     return s, h_fc1
+
+def restore_file(sess, saver, method_name):
+    checkpoint = tf.train.get_checkpoint_state("saved_networks/" + method_name)
+
+    t = 0
+    if checkpoint and checkpoint.model_checkpoint_path:
+        saver.restore(sess, checkpoint.model_checkpoint_path)
+
+        tokens = checkpoint.model_checkpoint_path.split("-")
+        t = int(tokens[2])
+
+        print(checkpoint.model_checkpoint_path)
+        print("Successfully loaded:", checkpoint.model_checkpoint_path)
+    else:
+        sess.run(tf.global_variables_initializer())
+        print("Could not find old network weights")
+
+    return t
