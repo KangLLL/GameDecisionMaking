@@ -45,7 +45,7 @@ def train_network(s, q_out, sess):
     D = deque()
 
     # saving and loading networks
-    saver = tf.train.Saver()
+    saver = tf.train.Saver(max_to_keep=None)
     t = fac.restore_file(sess, saver, settings.dqn_name)
 
     # start training

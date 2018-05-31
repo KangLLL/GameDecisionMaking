@@ -66,7 +66,7 @@ def train_network(s_actor, out_actor, s_critic, out_critic, sess):
     D = deque()
 
     # saving and loading networks
-    saver = tf.train.Saver()
+    saver = tf.train.Saver(max_to_keep=None)
     t = fac.restore_file(sess, saver, settings.ac_name)
 
     while True:
@@ -125,7 +125,7 @@ def train_network(s_actor, out_actor, s_critic, out_critic, sess):
 
         # save progress every 10000 iterations
         if t % 10000 == 0:
-            saver.save(sess, settings.model_dir + "/" + settings.ac_name + "/" + settings.game + "-dqn", global_step=t)
+            saver.save(sess, settings.model_dir + "/" + settings.ac_name + "/" + settings.game + "-acn", global_step=t)
 
         # print info
         print("TIMESTEP", t, "/ ACTION", action, "/ REWARD", game_state.reward, \
