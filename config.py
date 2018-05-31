@@ -16,7 +16,7 @@ flags.DEFINE_integer('frame_per_action', 1, 'the minimum interval frames between
 flags.DEFINE_integer('evaluate_episodes', 10000, 'number of iterations for each checkpoint')
 
 flags.DEFINE_string('model_dir', 'saved_networks', 'the name used for the parent directory')
-flags.DEFINE_string('dpn_name', 'dqn', 'the name used for the dqn model directory')
+flags.DEFINE_string('dqn_name', 'dqn', 'the name used for the dqn model directory')
 flags.DEFINE_string('ac_name', 'acn', 'the name used for the actor_critic model directory')
 
 flags.DEFINE_integer('random_seed', 1, 'Random seed to use during training')
