@@ -84,7 +84,7 @@ def train_network(s_actor, out_actor, s_critic, out_critic, sess):
             D.popleft()
 
         # only train if done observing
-        if t > settings.observe:
+        if t > settings.observe and len(D) > settings.batch:
             minibatch = random.sample(D, settings.batch)
 
             # get the batch variables

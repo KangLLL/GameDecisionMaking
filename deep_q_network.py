@@ -76,7 +76,7 @@ def train_network(s, q_out, sess):
             D.popleft()
 
         # only train if done observing
-        if t > settings.observe:
+        if t > settings.observe and len(D) > settings.batch:
             # sample a minibatch to train on
             minibatch = random.sample(D, settings.batch)
 
