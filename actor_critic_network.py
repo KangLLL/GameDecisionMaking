@@ -17,7 +17,7 @@ from collections import deque
 settings = tf.app.flags.FLAGS
 
 def _create_network(output_dimension):
-    s, h_fc1 = fac.build_conv_network()
+    s, h_fc1, _ = fac.build_conv_network()
     W_fc2, b_fc2 = fac.fc_variable([256, output_dimension])
 
     out = tf.matmul(h_fc1, W_fc2) + b_fc2
