@@ -14,6 +14,7 @@ from collections import deque
 
 settings = tf.app.flags.FLAGS
 
+
 def create_network():
     # network weights
     s, h_fc1, variables = fac.build_conv_network()
@@ -21,7 +22,11 @@ def create_network():
 
     # readout layer
     q_out = tf.matmul(h_fc1, W_fc2) + b_fc2
-    return s, q_out,variables.extend([W_fc2, b_fc2])
+
+    variables.append(W_fc2)
+    variables.append(b_fc2)
+
+    return s, q_out, variables
 
 
 def prepare_loss(q_out):
@@ -34,7 +39,7 @@ def prepare_loss(q_out):
     return y, a, train_step
 
 
-def train_network(s_pre, q_out_pre, vs_pre,s_tar, q_out_tar, vs_tar, sess):
+def train_network(s_pre, q_out_pre, vs_pre, s_tar, q_out_tar, vs_tar, sess):
     # define the cost function
     with tf.variable_scope('predict'):
         y, a, train_step = prepare_loss(q_out_pre)
@@ -56,12 +61,11 @@ def train_network(s_pre, q_out_pre, vs_pre,s_tar, q_out_tar, vs_tar, sess):
         readout_t = q_out_pre.eval(feed_dict={s_pre: [game_state.s_t]})[0]
 
         action = 0
-        if t % settings.frame_per_action == 0:
-            if random.random() <= epsilon:
-                print("----------Random Action----------")
-                action = random.randrange(settings.action)
-            else:
-                action = np.argmax(readout_t)
+        if random.random() <= epsilon:
+            print("----------Random Action----------")
+            action = random.randrange(settings.action)
+        else:
+            action = np.argmax(readout_t)
 
         # scale down epsilon
         if epsilon > settings.final_epsilon and t > settings.observe:
@@ -108,7 +112,7 @@ def train_network(s_pre, q_out_pre, vs_pre,s_tar, q_out_tar, vs_tar, sess):
         if t % 10000 == 0:
             saver.save(sess, settings.model_dir + "/" + settings.dqn_name + "/" + settings.game + "-dqn", global_step=t)
 
-        if t % settings.update_target_interval:
+        if t % settings.update_target_interval == 0:
             for i in range(len(vs_pre)):
                 sess.run(tf.assign(vs_tar[i], vs_pre[i].eval()))
 
@@ -136,7 +140,7 @@ def playGame():
         s_pre, q_out_pre, vs_pre = create_network()
     with tf.variable_scope('target'):
         s_tar, q_out_tar, vs_tar = create_network()
-    train_network(s_pre, q_out_pre, vs_pre,s_tar, q_out_tar, vs_tar, sess)
+    train_network(s_pre, q_out_pre, vs_pre, s_tar, q_out_tar, vs_tar, sess)
 
 
 def main():
