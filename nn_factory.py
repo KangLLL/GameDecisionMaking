@@ -45,7 +45,7 @@ def build_conv_network():
     h_conv2_flat = tf.reshape(h_conv2, [-1, 2592])
     h_fc1 = tf.nn.relu(tf.matmul(h_conv2_flat, W_fc1) + b_fc1)
 
-    return s, h_fc1
+    return s, h_fc1, [W_conv1, b_conv1, W_conv2, b_conv2, W_fc1, b_fc1]
 
 def restore_file(sess, saver, method_name):
     checkpoint = tf.train.get_checkpoint_state(settings.model_dir + "/" + method_name)

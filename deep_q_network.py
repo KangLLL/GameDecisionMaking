@@ -16,12 +16,12 @@ settings = tf.app.flags.FLAGS
 
 def create_network():
     # network weights
-    s, h_fc1 = fac.build_conv_network()
+    s, h_fc1, variables = fac.build_conv_network()
     W_fc2, b_fc2 = fac.fc_variable([256, settings.action])
 
     # readout layer
     q_out = tf.matmul(h_fc1, W_fc2) + b_fc2
-    return s, q_out
+    return s, q_out,variables.extend([W_fc2, b_fc2])
 
 
 def prepare_loss(q_out):
@@ -34,9 +34,10 @@ def prepare_loss(q_out):
     return y, a, train_step
 
 
-def train_network(s, q_out, sess):
+def train_network(s_pre, q_out_pre, vs_pre,s_tar, q_out_tar, vs_tar, sess):
     # define the cost function
-    y, a, train_step = prepare_loss(q_out)
+    with tf.variable_scope('predict'):
+        y, a, train_step = prepare_loss(q_out_pre)
 
     # open up a game state to communicate with emulator
     game_state = GameState(settings.action)
@@ -52,7 +53,7 @@ def train_network(s, q_out, sess):
     epsilon = settings.initial_epsilon
     while True:
         # choose an action epsilon greedily
-        readout_t = q_out.eval(feed_dict={s: [game_state.s_t]})[0]
+        readout_t = q_out_pre.eval(feed_dict={s_pre: [game_state.s_t]})[0]
 
         action = 0
         if t % settings.frame_per_action == 0:
@@ -87,7 +88,7 @@ def train_network(s, q_out, sess):
             s_j1_batch = [d[3] for d in minibatch]
 
             y_batch = []
-            readout_j1_batch = q_out.eval(feed_dict={s: s_j1_batch})
+            readout_j1_batch = q_out_tar.eval(feed_dict={s_tar: s_j1_batch})
             for i in range(0, len(minibatch)):
                 terminal = minibatch[i][4]
                 # if terminal, only equals reward
@@ -100,12 +101,16 @@ def train_network(s, q_out, sess):
             train_step.run(feed_dict={
                 y: y_batch,
                 a: a_batch,
-                s: s_j_batch}
+                s_pre: s_j_batch}
             )
 
         # save progress every 10000 iterations
         if t % 10000 == 0:
             saver.save(sess, settings.model_dir + "/" + settings.dqn_name + "/" + settings.game + "-dqn", global_step=t)
+
+        if t % settings.update_target_interval:
+            for i in range(len(vs_pre)):
+                sess.run(tf.assign(vs_tar[i], vs_pre[i].eval()))
 
         # print info
         state = ""
@@ -127,8 +132,11 @@ def train_network(s, q_out, sess):
 
 def playGame():
     sess = tf.InteractiveSession()
-    s, q_out = create_network()
-    train_network(s, q_out, sess)
+    with tf.variable_scope('predict'):
+        s_pre, q_out_pre, vs_pre = create_network()
+    with tf.variable_scope('target'):
+        s_tar, q_out_tar, vs_tar = create_network()
+    train_network(s_pre, q_out_pre, vs_pre,s_tar, q_out_tar, vs_tar, sess)
 
 
 def main():

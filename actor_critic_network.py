@@ -16,40 +16,43 @@ from collections import deque
 
 settings = tf.app.flags.FLAGS
 
-def _create_network(network_name, output_dimension):
-    with tf.variable_scope(network_name):
-        s, h_fc1 = fac.build_conv_network()
-        W_fc2, b_fc2 = fac.fc_variable([256, output_dimension])
+def _create_network(output_dimension):
+    s, h_fc1 = fac.build_conv_network()
+    W_fc2, b_fc2 = fac.fc_variable([256, output_dimension])
 
-        out = tf.matmul(h_fc1, W_fc2) + b_fc2
-        return s, out
+    out = tf.matmul(h_fc1, W_fc2) + b_fc2
+    return s, out
 
 def create_network():
     # build actor network
-    s_actor, readout_actor = _create_network("actor", settings.action)
     with tf.variable_scope("actor"):
+        s_actor, readout_actor = _create_network(settings.action)
         out_actor = tf.clip_by_value(tf.nn.softmax(readout_actor), 1e-20, 1.0)
 
     # build critic network
-    s_critic, readout_critic = _create_network("critic", 1)
+    with tf.variable_scope("critic"):
+        s_critic, readout_critic = _create_network(1)
+
     return s_actor, out_actor, s_critic, readout_critic
 
 def trainCritic(out_critic):
-    state_value = tf.placeholder(tf.float32, [None, 1])
+    with tf.variable_scope("critic"):
+        state_value = tf.placeholder(tf.float32, [None, 1])
 
-    td_error = state_value - out_critic
-    loss = tf.square(td_error)
+        td_error = state_value - out_critic
+        loss = tf.square(td_error)
     train_step = tf.train.AdamOptimizer(5e-7).minimize(loss)
 
     return state_value, td_error, train_step
 
 
 def trainActor(out_actor):
-    a = tf.placeholder(tf.float32, [None, settings.action])
-    td_error = tf.placeholder(tf.float32, [None], "td")
+    with tf.variable_scope("actor"):
+        a = tf.placeholder(tf.float32, [None, settings.action])
+        td_error = tf.placeholder(tf.float32, [None], "td")
 
-    log_prob = tf.log(tf.reduce_sum(tf.multiply(out_actor, a), reduction_indices=1))
-    loss = tf.reduce_sum(tf.multiply(td_error, log_prob))
+        log_prob = tf.log(tf.reduce_sum(tf.multiply(out_actor, a), reduction_indices=1))
+        loss = tf.reduce_sum(tf.multiply(td_error, log_prob))
     train_step = tf.train.AdamOptimizer(1e-6).minimize(-loss)
 
     return a, td_error, train_step

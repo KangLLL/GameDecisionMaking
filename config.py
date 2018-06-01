@@ -20,3 +20,6 @@ flags.DEFINE_string('dqn_name', 'dqn', 'the name used for the dqn model director
 flags.DEFINE_string('ac_name', 'acn', 'the name used for the actor_critic model directory')
 
 flags.DEFINE_integer('random_seed', 1, 'Random seed to use during training')
+
+
+flags.DEFINE_integer('update_target_interval', 100, 'synchronize target network frequency')
