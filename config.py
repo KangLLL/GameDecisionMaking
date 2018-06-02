@@ -22,4 +22,4 @@ flags.DEFINE_string('ac_name', 'acn', 'the name used for the actor_critic model 
 flags.DEFINE_integer('random_seed', 1, 'Random seed to use during training')
 
 
-flags.DEFINE_integer('update_target_interval', 300, 'synchronize target network frequency')
+flags.DEFINE_integer('update_target_interval', 3000, 'synchronize target network frequency')

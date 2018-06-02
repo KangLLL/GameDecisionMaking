@@ -34,7 +34,7 @@ def prepare_loss(q_out):
     y = tf.placeholder("float", [None])
     readout_action = tf.reduce_sum(tf.multiply(q_out, a), reduction_indices=1)
     cost = tf.reduce_mean(tf.square(y - readout_action))
-    train_step = tf.train.AdamOptimizer(1e-6).minimize(cost)
+    train_step = tf.train.AdamOptimizer(1e-5).minimize(cost)
 
     return y, a, train_step
 
@@ -51,7 +51,7 @@ def train_network(s_pre, q_out_pre, vs_pre, s_tar, q_out_tar, vs_tar, sess):
     D = deque()
 
     # saving and loading networks
-    saver = tf.train.Saver(max_to_keep=None)
+    saver = tf.train.Saver(max_to_keep=2)
     t = fac.restore_file(sess, saver, settings.dqn_name)
 
     # start training
