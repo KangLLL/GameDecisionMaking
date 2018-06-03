@@ -2,7 +2,6 @@
 from __future__ import print_function
 
 import tensorflow as tf
-import cv2
 import sys
 
 import random
@@ -110,7 +109,7 @@ def train_network(s_pre, q_out_pre, vs_pre, s_tar, q_out_tar, vs_tar, sess):
 
         # save progress every 10000 iterations
         if t % 10000 == 0:
-            saver.save(sess, settings.model_dir + "/" + settings.dqn_name + "/" + settings.game + "-dqn", global_step=t)
+            saver.save(sess, settings.model_dir + "/" + settings.dqn_name + "/" + settings.game + "-" + settings.dqn_name, global_step=t)
 
         if t % settings.update_target_interval == 0:
             for i in range(len(vs_pre)):

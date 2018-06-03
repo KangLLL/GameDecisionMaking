@@ -6,7 +6,10 @@ import time
 import matplotlib.pyplot as plt
 import sys
 import deep_q_network as dqn
-import actor_critic_network as acn
+# import actor_critic_network as acn
+
+from game_ac_network import GameACFFNetwork
+
 
 np.set_printoptions(threshold='nan')
 from game_state import GameState
@@ -15,39 +18,39 @@ settings = tf.app.flags.FLAGS
 
 def initialize_network(sess, method, file_name):
     if method == 0:
-        s, out = dqn.create_network()
-        method_name = settings.dpn_name
-        result = (s, out)
+        with tf.variable_scope('predict'):
+            s_pre, q_out_pre, vs_pre = dqn.create_network()
+        # with tf.variable_scope('target'):
+        #     s_tar, q_out_tar, vs_tar = dqn.create_network()
+        # with tf.variable_scope('predict'):
+        #     y, a, train_step = dqn.prepare_loss(q_out_pre)
+        result = (s_pre, q_out_pre)
     elif method == 1:
-        s_a, o_a, s_c, o_c = acn.create_network()
-        method_name = settings.acn_name
-        result = (s_a, o_a, s_c, o_c)
+        network = GameACFFNetwork(settings.action, 1, device="/cpu:0")
+        result = network
 
     saver = tf.train.Saver()
 
-    model_file_name = settings.model_dir + '/' + method_name + '/' + file_name
+    model_file_name = settings.model_dir + '/' + method_2_name(method) + '/' + file_name
     saver.restore(sess, model_file_name)
     print('Successfully loaded:', model_file_name)
 
     return result
 
 
-def choose_action(method, sess, s, out, s_values):
+def choose_action(method, sess, agent, s_values):
     if method == 0:
-        q_values = sess.run(out, {s: [s_values]})[0]
+        q_values = sess.run(agent[1], {agent[0]: [s_values]})[0]
         return np.argmax(q_values)
     elif method == 1:
-        probs = sess.run(out, {s: [s_values]})[0]
-        return np.random.choice(range(len(probs)), p=probs)
+        pi_, value_ = agent.run_policy_and_value(sess, s_values)
+        return np.random.choice(range(len(pi_)), p=pi_)
     return 0
 
 
-def display(t, method, rand_seed, s, o):
+def display(t, method, rand_seed, agent):
     log_file_path = 'log_{}.txt'.format(t)
-    if method == 0:
-        log_file_path = settings.model_dir + '/' + settings.dpn_name + '/' + log_file_path
-    elif method == 1:
-        log_file_path = settings.model_dir + '/' + settings.acn_name + '/' + log_file_path
+    log_file_path = settings.model_dir + '/' + method_2_name(method) + '/' + log_file_path
 
     episode = 0
     terminal = False
@@ -63,12 +66,12 @@ def display(t, method, rand_seed, s, o):
         episode_reward = 0
         episode_passed_obst = 0
 
-        game_state = GameState(rand_seed, settings.action, show_score=True)
+        game_state = GameState(settings.action, rand_seed, is_show_score=True)
         print 'EPISODE {}'.format(episode)
 
         full_frame = None
         while True:
-            action = choose_action(method, sess, s, o, game_state.s_t)
+            action = choose_action(method, sess, agent, game_state.s_t)
             game_state.process(action)
             terminal = game_state.terminal
             episode_step = game_state.steps
@@ -131,20 +134,19 @@ def display(t, method, rand_seed, s, o):
             '{},{}\n'.format(np.sum(episode_rewards) / settings.evaluate_episodes,
                              np.sum(episode_passed_obsts) / settings.evaluate_episodes))
 
+def method_2_name(method):
+    return settings.dqn_name if method == 0 else settings.acn_name
 
 if __name__ == '__main__':
-    method = 0  # 0: dpn 1: ac
-    t = 10000
+    method = 1  # 0: dpn 1: ac
+    t = 3510781
     if len(sys.argv) > 1:
         method = int(sys.argv[1])
     if len(sys.argv) > 2:
         t = int(sys.argv[2])
-    file_name = settings.game + '-' + method + '-' + str(t)
+    file_name = settings.game + '-' + method_2_name(method) + '-' + str(t)
 
     sess = tf.Session()
-    if method == 0:
-        s, o = initialize_network(sess, method, file_name)
-    else:
-        s, o, _, _ = initialize_network(sess, method, file_name)
+    agent = initialize_network(sess, method, file_name)
 
-    display(t, method, 1, s, o)
+    display(t, method, 1, agent)

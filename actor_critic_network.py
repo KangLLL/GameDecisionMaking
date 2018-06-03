@@ -25,15 +25,25 @@ def _create_network(output_dimension):
 
 def create_network():
     # build actor network
-    with tf.variable_scope("actor"):
-        s_actor, readout_actor = _create_network(settings.action)
-        out_actor = tf.clip_by_value(tf.nn.softmax(readout_actor), 1e-20, 1.0)
+    # with tf.variable_scope("actor"):
+    #     s_actor, readout_actor = _create_network(settings.action)
+    #     out_actor = tf.clip_by_value(tf.nn.softmax(readout_actor), 1e-20, 1.0)
+    #
+    # # build critic network
+    # with tf.variable_scope("critic"):
+    #     s_critic, readout_critic = _create_network(1)
+    #
+    # return s_actor, out_actor, s_critic, readout_critic
 
-    # build critic network
-    with tf.variable_scope("critic"):
-        s_critic, readout_critic = _create_network(1)
+    s, h_fc1, _ = fac.build_conv_network()
+    W_fc2, b_fc2 = fac.fc_variable([256, settings.action])
+    W_fc3, b_fc3 = fac.fc_variable([256, 1])
 
-    return s_actor, out_actor, s_critic, readout_critic
+    o_a = tf.matmul(h_fc1, W_fc2) + b_fc2
+    out_actor = tf.clip_by_value(tf.nn.softmax(o_a), 1e-20, 1.0)
+
+    out_critic = tf.matmul(h_fc1, W_fc3) + b_fc3
+    return s, out_actor, out_critic
 
 def trainCritic(out_critic):
     with tf.variable_scope("critic"):
@@ -41,7 +51,7 @@ def trainCritic(out_critic):
 
         td_error = state_value - out_critic
         loss = tf.square(td_error)
-    train_step = tf.train.AdamOptimizer(5e-7).minimize(loss)
+    train_step = tf.train.AdamOptimizer(2e-6).minimize(loss)
 
     return state_value, td_error, train_step
 
@@ -51,14 +61,14 @@ def trainActor(out_actor):
         a = tf.placeholder(tf.float32, [None, settings.action])
         td_error = tf.placeholder(tf.float32, [None], "td")
 
-        log_prob = tf.log(tf.reduce_sum(tf.multiply(out_actor, a), reduction_indices=1))
+        log_prob = -tf.log(tf.reduce_sum(tf.multiply(out_actor, a), reduction_indices=1))
         loss = tf.reduce_sum(tf.multiply(td_error, log_prob))
     train_step = tf.train.AdamOptimizer(1e-6).minimize(-loss)
 
     return a, td_error, train_step
 
-
-def train_network(s_actor, out_actor, s_critic, out_critic, sess):
+def train_network(s, out_actor, out_critic, sess):
+# def train_network(s_actor, out_actor, s_critic, out_critic, sess):
     # define the cost function
     sv_p, td, train_critic = trainCritic(out_critic)
     a, td_p, train_actor = trainActor(out_actor)
@@ -69,12 +79,12 @@ def train_network(s_actor, out_actor, s_critic, out_critic, sess):
     D = deque()
 
     # saving and loading networks
-    saver = tf.train.Saver(max_to_keep=None)
+    saver = tf.train.Saver(max_to_keep=1)
     t = fac.restore_file(sess, saver, settings.ac_name)
 
     while True:
         # choose an action with probability
-        probs = sess.run(out_actor, {s_actor: [game_state.s_t]})[0]  # get probabilities for all actions
+        probs = sess.run(out_actor, {s: [game_state.s_t]})[0]  # get probabilities for all actions
         action = np.random.choice(range(len(probs)), p=probs)  # return a int
 
         # run the selected action and observe next state and reward
@@ -97,7 +107,7 @@ def train_network(s_actor, out_actor, s_critic, out_critic, sess):
             s_j1_batch = [d[3] for d in minibatch]
 
             y_batch = []
-            readout_j1_batch = out_critic.eval(feed_dict={s_critic: s_j1_batch}, session=sess)
+            readout_j1_batch = out_critic.eval(feed_dict={s: s_j1_batch}, session=sess)
             for i in range(0, len(minibatch)):
                 terminal = minibatch[i][4]
                 # if terminal, only equals reward
@@ -110,12 +120,12 @@ def train_network(s_actor, out_actor, s_critic, out_critic, sess):
             # print("before:")
             # print(out_critic.eval(feed_dict={s_critic: s_j_batch}, session=sess))
             # print(out_actor.eval(feed_dict={s_actor: s_j_batch}, session=sess))
-            td_batch = td.eval(feed_dict={s_critic: s_j_batch, sv_p: y_batch.reshape((len(minibatch), 1))}, session=sess)
+            td_batch = td.eval(feed_dict={s: s_j_batch, sv_p: y_batch.reshape((len(minibatch), 1))}, session=sess)
 
             # perform gradient step
-            train_critic.run(feed_dict={s_critic: s_j_batch, sv_p: y_batch.reshape((len(minibatch), 1))})
+            train_critic.run(feed_dict={s: s_j_batch, sv_p: y_batch.reshape((len(minibatch), 1))})
             # actor_train_step.run(feed_dict={s_actor: s_j_batch})
-            train_actor.run(feed_dict={s_actor: s_j_batch, a: a_batch, td_p: td_batch.reshape(-1)})
+            train_actor.run(feed_dict={s: s_j_batch, a: a_batch, td_p: td_batch.reshape(-1)})
 
             # print("after:")
             # print("value:")
@@ -141,8 +151,10 @@ def train_network(s_actor, out_actor, s_critic, out_critic, sess):
 
 def playGame():
     sess = tf.InteractiveSession()
-    s_actor, out_actor, s_critic, out_critic = create_network()
-    train_network(s_actor, out_actor, s_critic, out_critic, sess)
+    # s_actor, out_actor, s_critic, out_critic = create_network()
+    s, out_actor, out_critic = create_network()
+    # train_network(s_actor, out_actor, s_critic, out_critic, sess)
+    train_network(s, out_actor, out_critic, sess)
 
 def main():
     playGame()
