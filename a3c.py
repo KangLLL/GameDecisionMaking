@@ -90,9 +90,9 @@ if __name__ == "__main__":
     stop_requested = False
 
     if settings.agent_type == 'LSTM':
-        global_network = GameACLSTMNetwork(settings.action_size, -1, device)
+        global_network = GameACLSTMNetwork(settings.action, -1, device)
     else:
-        global_network = GameACFFNetwork(settings.action_size, -1, device)
+        global_network = GameACFFNetwork(settings.action, -1, device)
 
     training_threads = []
 
@@ -113,7 +113,7 @@ if __name__ == "__main__":
                                             grad_applier,
                                             settings.max_time_step,
                                             device,
-                                            settings.action_size,
+                                            settings.action,
                                             settings.gamma,
                                             settings.local_t_max,
                                             settings.entropy_beta,
