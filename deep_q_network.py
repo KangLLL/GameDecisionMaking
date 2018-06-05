@@ -50,11 +50,14 @@ def train_network(s_pre, q_out_pre, vs_pre, s_tar, q_out_tar, vs_tar, sess):
     D = deque()
 
     # saving and loading networks
-    saver = tf.train.Saver(max_to_keep=2)
+    saver = tf.train.Saver(max_to_keep=None)
     t = fac.restore_file(sess, saver, settings.dqn_name)
 
     # start training
     epsilon = settings.initial_epsilon
+
+    episode = 0
+
     while True:
         # choose an action epsilon greedily
         readout_t = q_out_pre.eval(feed_dict={s_pre: [game_state.s_t]})[0]
@@ -107,13 +110,6 @@ def train_network(s_pre, q_out_pre, vs_pre, s_tar, q_out_tar, vs_tar, sess):
                 s_pre: s_j_batch}
             )
 
-        # save progress every 10000 iterations
-        if t % 10000 == 0:
-            saver.save(sess, settings.model_dir + "/" + settings.dqn_name + "/" + settings.game + "-" + settings.dqn_name, global_step=t)
-
-        if t % settings.update_target_interval == 0:
-            for i in range(len(vs_pre)):
-                sess.run(tf.assign(vs_tar[i], vs_pre[i].eval()))
 
         # print info
         state = ""
@@ -128,9 +124,25 @@ def train_network(s_pre, q_out_pre, vs_pre, s_tar, q_out_tar, vs_tar, sess):
               "/ EPSILON", epsilon, "/ ACTION", action, "/ REWARD", game_state.reward, \
               "/ Q_MAX %e" % np.max(readout_t))
 
+
         # update the old values
         game_state.update()
         t += 1
+
+        # save progress every 10000 iterations
+        if t % 20000 == 0:
+            saver.save(sess, settings.model_dir + "/" + settings.dqn_name + "/" + settings.game + "-" + settings.dqn_name, global_step=t)
+
+        if game_state.terminal:
+            episode += 1
+            if episode % 50 == 0:
+                saver.save(sess,
+                           settings.model_dir + "/" + settings.dqn_name + "/episodes/" + settings.game + "-" + settings.dqn_name,
+                           global_step=episode)
+
+        if t % settings.update_target_interval == 0:
+            for i in range(len(vs_pre)):
+                sess.run(tf.assign(vs_tar[i], vs_pre[i].eval()))
 
 
 def playGame():
