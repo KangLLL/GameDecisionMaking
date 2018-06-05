@@ -16,7 +16,7 @@ from game_state import GameState
 
 settings = tf.app.flags.FLAGS
 
-def initialize_network(sess, method, file_name):
+def create_network(method):
     if method == 0:
         with tf.variable_scope('predict'):
             s_pre, q_out_pre, vs_pre = dqn.create_network()
@@ -29,13 +29,15 @@ def initialize_network(sess, method, file_name):
         network = GameACFFNetwork(settings.action, 1, device="/cpu:0")
         result = network
 
+    return result
+
+
+def reset_network(sess, method, file_name):
     saver = tf.train.Saver()
 
     model_file_name = settings.model_dir + '/' + method_2_name(method) + '/' + file_name
     saver.restore(sess, model_file_name)
     print('Successfully loaded:', model_file_name)
-
-    return result
 
 
 def choose_action(method, sess, agent, s_values):
@@ -49,8 +51,7 @@ def choose_action(method, sess, agent, s_values):
 
 
 def display(t, method, rand_seed, agent):
-    log_file_path = 'log_{}.txt'.format(t)
-    log_file_path = settings.model_dir + '/' + method_2_name(method) + '/' + log_file_path
+    log_file_path = settings.model_dir + '/' + method_2_name(method) + '.txt'
 
     episode = 0
     terminal = False
@@ -102,9 +103,9 @@ def display(t, method, rand_seed, agent):
                                                                                                         episode_reward,
                                                                                                         reward_steps)
 
-        with open(log_file_path, "a") as text_file:
-            text_file.write(
-                '{},{},{},{},{}\n'.format(episode, episode_step, passed_obst, episode_reward, reward_steps))
+        # with open(log_file_path, "a") as text_file:
+        #     text_file.write(
+        #         '{},{},{},{},{}\n'.format(episode, episode_step, passed_obst, episode_reward, reward_steps))
 
         episode += 1
 
@@ -131,22 +132,30 @@ def display(t, method, rand_seed, agent):
 
     with open(log_file_path, "a") as text_file:
         text_file.write(
-            '{},{}\n'.format(np.sum(episode_rewards) / settings.evaluate_episodes,
+            '{} {} {}\n'.format(t, np.sum(episode_rewards) / settings.evaluate_episodes,
                              np.sum(episode_passed_obsts) / settings.evaluate_episodes))
 
 def method_2_name(method):
     return settings.dqn_name if method == 0 else settings.acn_name
 
 if __name__ == '__main__':
-    method = 1  # 0: dpn 1: ac
-    t = 3510781
+    method = 0  # 0: dpn 1: ac
+    t_start = 20000
+    t_end = 40000
     if len(sys.argv) > 1:
         method = int(sys.argv[1])
-    if len(sys.argv) > 2:
-        t = int(sys.argv[2])
-    file_name = settings.game + '-' + method_2_name(method) + '-' + str(t)
 
     sess = tf.Session()
-    agent = initialize_network(sess, method, file_name)
+    agent = create_network(method)
+    for t in range(t_start, t_end + 20000, 20000):
+        file_name = settings.game + '-' + method_2_name(method) + '-' + str(t)
+        reset_network(sess, method, file_name)
+        display(t, method, 1, agent)
 
-    display(t, method, 1, agent)
+
+    ep_start = 50
+    ep_end = 100
+    for ep in range(ep_start, ep_end + 50, 50):
+        file_name = 'episodes/' + settings.game + '-' + method_2_name(method) + '-' + str(ep)
+        reset_network(sess, method, file_name)
+        display('ep_{}'.format(ep), method, 1, agent)

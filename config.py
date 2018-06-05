@@ -13,7 +13,7 @@ flags.DEFINE_integer('replay_memory', 50000, 'number of transitions to remember'
 flags.DEFINE_integer('batch', 32, 'size of minibatch')
 flags.DEFINE_integer('frame_per_action', 1, 'the minimum interval frames between two actions')
 
-flags.DEFINE_integer('evaluate_episodes', 10000, 'number of iterations for each checkpoint')
+flags.DEFINE_integer('evaluate_episodes', 5, 'number of iterations for each checkpoint')
 
 flags.DEFINE_string('model_dir', 'saved_networks', 'the name used for the parent directory')
 flags.DEFINE_string('dqn_name', 'dqn', 'the name used for the dqn model directory')
