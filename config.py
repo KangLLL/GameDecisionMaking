@@ -30,13 +30,13 @@ flags.DEFINE_string('experiment_name', 'flappybird', 'Name of the current experi
 flags.DEFINE_boolean('use_gpu', False, 'If GPU should be used to speed up the training process')
 
 # AGENT
-flags.DEFINE_integer('parallel_agent_size', 16, 'Number of parallel agents')
+flags.DEFINE_integer('parallel_agent_size', 1, 'Number of parallel agents')
 flags.DEFINE_string('agent_type', 'FF', 'What type of A3C to train the agent with [FF, LSTM] (default FF)')
 
 # TRAINING
-flags.DEFINE_integer('max_time_step', 40000000, 'Maximum training steps')
-flags.DEFINE_float('initial_alpha_low', -5, 'LogUniform low limit for learning rate (represents x in 10^x)')
-flags.DEFINE_float('initial_alpha_high', -3, 'LogUniform high limit for learning rate (represents x in 10^x)')
+flags.DEFINE_integer('max_time_step', 3000, 'Maximum training steps')
+flags.DEFINE_float('initial_alpha_low', -6, 'LogUniform low limit for learning rate (represents x in 10^x)')
+flags.DEFINE_float('initial_alpha_high', -6, 'LogUniform high limit for learning rate (represents x in 10^x)')
 flags.DEFINE_float('entropy_beta', 0.01, 'Entropy regularization constant')
 flags.DEFINE_float('grad_norm_clip', 40.0, 'Gradient norm clipping')
 

@@ -6,8 +6,7 @@ import time
 import sys
 
 from game_state import GameState
-from game_ac_network import GameACFFNetwork, GameACLSTMNetwork
-from statistics import Statistics
+from game_ac_network import GameACFFNetwork
 
 
 class A3CTrainingThread(object):
@@ -38,10 +37,7 @@ class A3CTrainingThread(object):
         self.performance_log_interval = performance_log_interval
         self.log_level = log_level
 
-        if self.agent_type == 'LSTM':
-            self.local_network = GameACLSTMNetwork(self.action_size, thread_index, device)
-        else:
-            self.local_network = GameACFFNetwork(self.action_size, thread_index, device)
+        self.local_network = GameACFFNetwork(self.action_size, thread_index, device)
 
         self.local_network.prepare_loss(entropy_beta)
 
@@ -99,7 +95,7 @@ class A3CTrainingThread(object):
     def set_start_time(self, start_time):
         self.start_time = start_time
 
-    def process(self, sess, global_t, statistics):
+    def process(self, sess, global_t):
         states = []
         actions = []
         rewards = []
@@ -111,9 +107,6 @@ class A3CTrainingThread(object):
         sess.run(self.sync)
 
         start_local_t = self.local_t
-
-        if self.agent_type == 'LSTM':
-            start_lstm_state = self.local_network.lstm_state_out
 
         # t_max times loop
         for i in range(self.local_t_max):
@@ -133,14 +126,12 @@ class A3CTrainingThread(object):
             # receive game result
             reward = self.game_state.reward
             terminal = self.game_state.terminal
-            steps = self.game_state.steps
-            passed = self.game_state.passed_obst
+
 
             self.episode_reward += reward
 
             # clip reward
-            rewards.append(np.clip(reward, -1, 1))
-
+            rewards.append(reward)
             self.local_t += 1
 
             # s_t1 -> s_t
@@ -148,26 +139,13 @@ class A3CTrainingThread(object):
 
             self.total_q_max += np.max(pi_)
             self.episode_actions.append(action)
-            self.passed_obst = self.game_state.passed_obst
 
             if terminal:
                 terminal_end = True
                 self.episode += 1
 
-                if self.log_level == 'FULL':
-                    reward_steps = format(float(self.episode_reward) / float(steps), '.4f')
-                    print "THREAD: {}  /  EPISODE: {}  /  TOTAL STEPS: {}  /  STEPS: {}  /  PASSED OBST: {}  /  REWARD: {}  /  REWARD/STEP: {}".format(
-                        self.thread_index, self.episode, global_t, steps, self.passed_obst, self.episode_reward,
-                        reward_steps)
-
-                statistics.update(global_t, self.episode_reward, self.total_q_max, steps, self.episode_actions,
-                                  self.learn_rate, self.passed_obst)
-
                 self.reset_counters()
-
                 self.game_state.reset()
-                if self.agent_type == 'LSTM':
-                    self.local_network.reset_state()
                 break
 
         R = 0.0
@@ -198,37 +176,19 @@ class A3CTrainingThread(object):
 
         cur_learning_rate = self._anneal_learning_rate(global_t)
 
-        if self.agent_type == 'LSTM':
-            batch_si.reverse()
-            batch_a.reverse()
-            batch_td.reverse()
-            batch_R.reverse()
+        # batch_si.reverse()
+        # batch_a.reverse()
+        # batch_td.reverse()
+        # batch_R.reverse()
 
-            sess.run(self.apply_gradients,
-                     feed_dict={
-                         self.local_network.s: batch_si,
-                         self.local_network.a: batch_a,
-                         self.local_network.td: batch_td,
-                         self.local_network.r: batch_R,
-                         self.local_network.initial_lstm_state: start_lstm_state,
-                         self.local_network.step_size: [len(batch_a)],
-                         self.learning_rate_input: cur_learning_rate})
-        else:
-            sess.run(self.apply_gradients,
-                     feed_dict={
-                         self.local_network.s: batch_si,
-                         self.local_network.a: batch_a,
-                         self.local_network.td: batch_td,
-                         self.local_network.r: batch_R,
-                         self.learning_rate_input: cur_learning_rate})
+        sess.run(self.apply_gradients,
+                 feed_dict={
+                     self.local_network.s: batch_si,
+                     self.local_network.a: batch_a,
+                     self.local_network.td: batch_td,
+                     self.local_network.r: batch_R,
+                     self.learning_rate_input: cur_learning_rate})
 
-        if (self.thread_index == 0) and (self.local_t - self.prev_local_t >= self.performance_log_interval) and (
-                self.log_level == 'FULL'):
-            self.prev_local_t += self.performance_log_interval
-            elapsed_time = time.time() - self.start_time
-            steps_per_sec = global_t / elapsed_time
-            print("### Performance : {} STEPS in {:.0f} sec. {:.0f} STEPS/sec. {:.2f}M STEPS/hour".format(
-                global_t, elapsed_time, steps_per_sec, steps_per_sec * 3600 / 1000000.))
 
         # return advanced local step size
         diff_local_t = self.local_t - start_local_t

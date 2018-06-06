@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import tensorflow as tf
+import multiprocessing
 import threading
 import numpy as np
 
@@ -46,7 +47,7 @@ def train_function(parallel_index):
         if global_t > settings.max_time_step:
             break
 
-        diff_global_t = training_thread.process(sess, global_t, statistics)
+        diff_global_t = training_thread.process(sess, global_t)
         global_t += diff_global_t
 
 
@@ -82,22 +83,17 @@ if __name__ == "__main__":
     if settings.use_gpu:
         device = "/gpu:0"
 
+    num_threads = multiprocessing.cpu_count()
     initial_learning_rates = log_uniform(settings.initial_alpha_low,
                                          settings.initial_alpha_high,
-                                         settings.parallel_agent_size)
-    global_t = 0
+                                         num_threads)
 
+    global_t = 0
     stop_requested = False
 
-    if settings.agent_type == 'LSTM':
-        global_network = GameACLSTMNetwork(settings.action, -1, device)
-    else:
-        global_network = GameACFFNetwork(settings.action, -1, device)
-
-    training_threads = []
+    global_network = GameACFFNetwork(settings.action, -1, device)
 
     learning_rate_input = tf.placeholder("float")
-
     grad_applier = RMSPropApplier(learning_rate=learning_rate_input,
                                   decay=settings.rmsp_alpha,
                                   momentum=0.0,
@@ -105,7 +101,10 @@ if __name__ == "__main__":
                                   clip_norm=settings.grad_norm_clip,
                                   device=device)
 
-    for i in range(settings.parallel_agent_size):
+    training_threads = []
+
+
+    for i in range(num_threads):
         training_thread = A3CTrainingThread(i,
                                             global_network,
                                             initial_learning_rates[i],
@@ -128,8 +127,7 @@ if __name__ == "__main__":
     sess = tf.Session(config=tf.ConfigProto(log_device_placement=False,
                                             allow_soft_placement=True))
 
-    init = tf.global_variables_initializer()
-    sess.run(init)
+    sess.run(tf.global_variables_initializer())
 
     # Statistics summary writer
     summary_writer = tf.summary.FileWriter(LOG_FILE, sess.graph)
