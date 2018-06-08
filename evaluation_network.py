@@ -71,7 +71,7 @@ def display(t, method, rand_seed, agent):
         episode_reward = 0
         episode_passed_obst = 0
 
-        game_state = GameState(settings.action, rand_seed, is_show_score=True)
+        game_state = GameState(settings.action, rand_seed, is_show_score=True) if method != 1 else GameState(settings.action, rand_seed, is_show_score=True, frame_size=80)
         print 'EPISODE {}'.format(episode)
 
         full_frame = None
@@ -144,8 +144,8 @@ def method_2_name(method):
 
 if __name__ == '__main__':
     method = 1  # 0: dpn 1: dqn-without-target 2:acn 3:a3c
-    t_start = 20000
-    t_end = 40000
+    t_start = 10000
+    t_end = 1000000
     if len(sys.argv) > 1:
         method = int(sys.argv[1])
 

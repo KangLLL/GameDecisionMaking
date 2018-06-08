@@ -10,7 +10,7 @@ import time
 import cv2
 
 class GameState(object):
-    def __init__(self, action_size, rand_seed=0, is_show_score=False):
+    def __init__(self, action_size, rand_seed=0, is_show_score=False, frame_size=84):
         self.rand_seed = rand_seed
         random.seed(self.rand_seed)
         self.action_size = action_size
@@ -22,6 +22,8 @@ class GameState(object):
 
         self.reward = 0
         self.terminal = False
+
+        self.frame_size = frame_size
 
         self.reset()
 
@@ -35,13 +37,13 @@ class GameState(object):
             if self.is_show_score:
                 self.full_frame = self.game.full_frame
 
-        x_t = cv2.cvtColor(cv2.resize(x_t, (84, 84)), cv2.COLOR_BGR2GRAY)
+        x_t = cv2.cvtColor(cv2.resize(x_t, (self.frame_size, self.frame_size)), cv2.COLOR_BGR2GRAY)
         ret, x_t = cv2.threshold(x_t, 1, 255, cv2.THRESH_BINARY)
 
         self.x_t = x_t  # used for visualization
 
         if is_need_reshape:
-            x_t = np.reshape(x_t, (84, 84, 1))
+            x_t = np.reshape(x_t, (self.frame_size, self.frame_size, 1))
 
         return x_t, reward, terminal
 
