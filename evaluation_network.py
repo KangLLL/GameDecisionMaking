@@ -6,7 +6,8 @@ import time
 import matplotlib.pyplot as plt
 import sys
 import deep_q_network as dqn
-# import actor_critic_network as acn
+import deep_q_network_l as dqn_l
+import actor_critic_network as acn
 
 from game_ac_network import GameACFFNetwork
 
@@ -26,6 +27,9 @@ def create_network(method):
         #     y, a, train_step = dqn.prepare_loss(q_out_pre)
         result = (s_pre, q_out_pre)
     elif method == 1:
+        s, out, _ = dqn_l.createNetwork()
+        result = (s, out)
+    elif method == 3:
         network = GameACFFNetwork(settings.action, 1, device="/cpu:0")
         result = network
 
@@ -41,10 +45,10 @@ def reset_network(sess, method, file_name):
 
 
 def choose_action(method, sess, agent, s_values):
-    if method == 0:
+    if method == 0 or method == 1:
         q_values = sess.run(agent[1], {agent[0]: [s_values]})[0]
         return np.argmax(q_values)
-    elif method == 1:
+    elif method == 2:
         pi_, value_ = agent.run_policy_and_value(sess, s_values)
         return np.random.choice(range(len(pi_)), p=pi_)
     return 0
@@ -136,10 +140,10 @@ def display(t, method, rand_seed, agent):
                              np.sum(episode_passed_obsts) / settings.evaluate_episodes))
 
 def method_2_name(method):
-    return settings.dqn_name if method == 0 else settings.acn_name
+    return settings.dqn_name if method == 0 else "l" if method == 1 else settings.acn_name
 
 if __name__ == '__main__':
-    method = 0  # 0: dpn 1: ac
+    method = 1  # 0: dpn 1: dqn-without-target 2:acn 3:a3c
     t_start = 20000
     t_end = 40000
     if len(sys.argv) > 1:
@@ -147,15 +151,16 @@ if __name__ == '__main__':
 
     sess = tf.Session()
     agent = create_network(method)
-    for t in range(t_start, t_end + 20000, 20000):
+    for t in range(t_start, t_end + 10000, 10000):
         file_name = settings.game + '-' + method_2_name(method) + '-' + str(t)
         reset_network(sess, method, file_name)
         display(t, method, 1, agent)
 
 
-    ep_start = 50
-    ep_end = 100
-    for ep in range(ep_start, ep_end + 50, 50):
-        file_name = 'episodes/' + settings.game + '-' + method_2_name(method) + '-' + str(ep)
-        reset_network(sess, method, file_name)
-        display('ep_{}'.format(ep), method, 1, agent)
+    if method == 0:
+        ep_start = 50
+        ep_end = 100
+        for ep in range(ep_start, ep_end + 50, 50):
+            file_name = 'episodes/' + settings.game + '-' + method_2_name(method) + '-' + str(ep)
+            reset_network(sess, method, file_name)
+            display('ep_{}'.format(ep), method, 1, agent)
