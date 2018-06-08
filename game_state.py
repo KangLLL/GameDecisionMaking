@@ -16,10 +16,7 @@ class GameState(object):
         self.action_size = action_size
         self.is_show_score = is_show_score
 
-        self.reset()
-
         self.steps = 1
-
         self.reward = 0
         self.terminal = False
 
