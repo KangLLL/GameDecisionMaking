@@ -152,7 +152,7 @@ if __name__ == '__main__':
     sess = tf.Session()
     agent = create_network(method)
     for t in range(t_start, t_end + 10000, 10000):
-        file_name = settings.game + '-' + method_2_name(method) + '-' + str(t)
+        file_name = settings.game + '-' + method_2_name(method) + '-' + str(t) if method != 1 else settings.game + '-dqn-' + str(t)
         reset_network(sess, method, file_name)
         display(t, method, 1, agent)
 
