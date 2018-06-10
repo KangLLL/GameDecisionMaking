@@ -1,5 +1,5 @@
 import numpy as np
-import sys
+
 import random
 import pygame
 import flappy_bird_utils
@@ -32,8 +32,7 @@ PLAYER_INDEX_GEN = cycle([0, 1, 2, 1])
 class GameState:
     def __init__(self, rand_seed=0, is_show_score=False):
         self.rand_seed = rand_seed
-        if rand_seed > 0:
-            random.seed(rand_seed)
+        random.seed(rand_seed)
         self.is_show_score = is_show_score
         self.score = self.playerIndex = self.loopIter = 0
         self.playerx = int(SCREENWIDTH * 0.2)
@@ -195,6 +194,8 @@ def checkCrash(player, upperPipes, lowerPipes):
 
     # if player crashes into ground
     if player['y'] + player['h'] >= BASEY - 1:
+        return True
+    elif player['y'] == 0:
         return True
     else:
 

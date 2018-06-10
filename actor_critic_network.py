@@ -24,19 +24,19 @@ def _create_network(output_dimension):
     out = tf.matmul(h_fc1, W_fc2) + b_fc2
     return s, out
 
-
-def create_network():
+def create_two_network():
     # build actor network
-    # with tf.variable_scope("actor"):
-    #     s_actor, readout_actor = _create_network(settings.action)
-    #     out_actor = tf.clip_by_value(tf.nn.softmax(readout_actor), 1e-20, 1.0)
-    #
-    # # build critic network
-    # with tf.variable_scope("critic"):
-    #     s_critic, readout_critic = _create_network(1)
-    #
-    # return s_actor, out_actor, s_critic, readout_critic
+    with tf.variable_scope("actor"):
+        s_actor, readout_actor = _create_network(settings.action)
+        out_actor = tf.clip_by_value(tf.nn.softmax(readout_actor), 1e-20, 1.0)
 
+    # build critic network
+    with tf.variable_scope("critic"):
+        s_critic, readout_critic = _create_network(1)
+
+    return s_actor, out_actor, s_critic, readout_critic
+
+def create_shared_network():
     s, h_fc1, _ = fac.build_conv_network()
     W_fc2, b_fc2 = fac.fc_variable([256, settings.action])
     W_fc3, b_fc3 = fac.fc_variable([256, 1])
@@ -47,6 +47,21 @@ def create_network():
     out_critic = tf.matmul(h_fc1, W_fc3) + b_fc3
     return s, out_actor, out_critic
 
+
+def prepare_critic_loss(out_critic):
+    R = tf.placeholder(tf.float32, [None, 1])
+    td = R - out_critic
+
+    loss = tf.nn.l2_loss(td)
+    return R, td, loss
+
+def prepare_actor_loss(out_actor):
+    td = tf.placeholder(tf.float32, [None, 1])
+    a = tf.placeholder(tf.float32, [None, settings.action])
+    log_pi = tf.log(out_actor)
+    loss = -tf.reduce_sum(tf.multiply(log_pi, a), reduction_indices=1) * td
+
+    return td, a, loss
 
 def prepare_loss(out_critic, out_actor):
     state_value = tf.placeholder(tf.float32, [None, 1])
@@ -67,29 +82,39 @@ def prepare_loss(out_critic, out_actor):
     return state_value, a, total_loss
 
 
-def train_network(s, out_actor, out_critic, sess):
+def train_network(s_actor, out_actor, s_critic, out_critic, sess):
     # def train_network(s_actor, out_actor, s_critic, out_critic, sess):
     # define the cost function
-    sv_p, a, loss = prepare_loss(out_critic, out_actor)
 
-    train_step = tf.train.AdamOptimizer(5e-7).minimize(loss)
+    R_p, td_v, loss_c = prepare_critic_loss(out_critic)
+    td_p, a_p, loss_a = prepare_actor_loss(out_actor)
+
+
+    train_actor = tf.train.AdamOptimizer(1e-6).minimize(loss_a)
+    train_critic = tf.train.AdamOptimizer(2e-6).minimize(loss_c)
+
+    # sv_p, a, loss = prepare_loss(out_critic, out_actor)
+    #
+    # train_step = tf.train.AdamOptimizer(1e-6).minimize(loss)
     game_state = GameState(settings.action)
 
     # saving and loading networks
     saver = tf.train.Saver(max_to_keep=1)
     t = fac.restore_file(sess, saver, settings.acn_name)
+    # t = 0
 
     s_batch = []
     a_batch = []
     r_batch = []
     s_prime_batch = []
     v_batch = []
+    R_batch = []
 
-    k_step = 10
+    # k_step = 1
 
     while True:
         # choose an action with probability
-        probs = sess.run(out_actor, {s: [game_state.s_t]})[0]  # get probabilities for all actions
+        probs = sess.run(out_actor, {s_actor: [game_state.s_t]})[0]  # get probabilities for all actions
         action = np.random.choice(range(len(probs)), p=probs)  # return a int
 
         # run the selected action and observe next state and reward
@@ -99,33 +124,35 @@ def train_network(s, out_actor, out_critic, sess):
         a_batch.append(game_state.vectorize_action(action))
         r_batch.append(game_state.reward)
         s_prime_batch.append(game_state.s_t1)
+        v_batch.append(sess.run(out_critic, {s_critic:[game_state.s_t]})[0][0])
 
         if game_state.terminal:
-            v_batch.append(game_state.reward)
+            s_batch.reverse()
+            a_batch.reverse()
+            r_batch.reverse()
+            s_prime_batch.reverse()
+            v_batch.reverse()
 
+            R = 0
             for i in range(len(s_batch)):
-                I = 1
-                v_batch[i] = 0
-                for j in range(k_step):
-                    if i + j == len(s_batch):
-                        break;
-                    v_batch[i] += I * r_batch[i + j]
-                    I = I * settings.gamma
-                if i + k_step < len(s_batch):
-                    v_batch[i] += I * v_batch[i + k_step]
+                R = r_batch[i] + R * settings.gamma
+                R_batch.append([R])
 
-            v_batch = np.array(v_batch)
+            td_batch = td_v.eval(feed_dict={s_critic: s_batch, R_p: R_batch })
+            train_critic.run(feed_dict={s_critic: s_batch, R_p: R_batch})
+            train_actor.run(feed_dict={s_actor: s_batch, td_p: td_batch, a_p: a_batch})
 
-            train_step.run(feed_dict={s: s_batch, sv_p: v_batch.reshape((len(s_batch),1)), a: a_batch})
+            # train_step.run(feed_dict={s: s_batch, sv_p: v_batch.reshape((len(s_batch),1)), a: a_batch})
 
             s_batch = []
             a_batch = []
             r_batch = []
             s_prime_batch = []
             v_batch = []
+            R_batch = []
 
-        else:
-            v_batch.append(settings.gamma * out_critic.eval(feed_dict={s: [game_state.s_t1]}, session=sess)[0][0])
+        # else:
+        #     v_batch.append(settings.gamma * out_critic.eval(feed_dict={s: [game_state.s_t1]}, session=sess)[0][0])
 
             # y = game_state.reward + settings.gamma * out_critic.eval(feed_dict={s: [game_state.s_t1]}, session=sess)[0]
 
@@ -143,8 +170,8 @@ def train_network(s, out_actor, out_critic, sess):
         # print(out_actor.eval(feed_dict={s_actor: s_j_batch}, session=sess))
 
         # save progress every 10000 iterations
-        # if t % 10000 == 0:
-        #     saver.save(sess, settings.model_dir + "/" + settings.acn_name + "/" + settings.game + "-acn", global_step=t)
+        if t % 20000 == 0:
+            saver.save(sess, settings.model_dir + "/" + settings.acn_name + "/" + settings.game + "-acn", global_step=t)
 
         # print info
         print("TIMESTEP", t, "/ ACTION", action, "/ REWARD", game_state.reward, \
@@ -157,10 +184,10 @@ def train_network(s, out_actor, out_critic, sess):
 
 def playGame():
     sess = tf.InteractiveSession()
-    # s_actor, out_actor, s_critic, out_critic = create_network()
-    s, out_actor, out_critic = create_network()
+    s_actor, out_actor, s_critic, out_critic = create_two_network()
+    # s, out_actor, out_critic = create_network()
     # train_network(s_actor, out_actor, s_critic, out_critic, sess)
-    train_network(s, out_actor, out_critic, sess)
+    train_network(s_actor, out_actor, s_critic, out_critic, sess)
 
 
 def main():
