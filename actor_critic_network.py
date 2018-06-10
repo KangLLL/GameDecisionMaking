@@ -99,7 +99,7 @@ def train_network(s_actor, out_actor, s_critic, out_critic, sess):
     game_state = GameState(settings.action)
 
     # saving and loading networks
-    saver = tf.train.Saver(max_to_keep=1)
+    saver = tf.train.Saver(max_to_keep=None)
     t = fac.restore_file(sess, saver, settings.acn_name)
     # t = 0
 
