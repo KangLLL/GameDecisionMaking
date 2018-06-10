@@ -169,10 +169,6 @@ def train_network(s_actor, out_actor, s_critic, out_critic, sess):
         # print("actor:")
         # print(out_actor.eval(feed_dict={s_actor: s_j_batch}, session=sess))
 
-        # save progress every 10000 iterations
-        if t % 20000 == 0:
-            saver.save(sess, settings.model_dir + "/" + settings.acn_name + "/" + settings.game + "-acn", global_step=t)
-
         # print info
         print("TIMESTEP", t, "/ ACTION", action, "/ REWARD", game_state.reward, \
               "/ ACTION_PROBOBILITY", probs)
@@ -180,6 +176,10 @@ def train_network(s_actor, out_actor, s_critic, out_critic, sess):
         # update the old values
         t += 1
         game_state.update()
+
+        # save progress every 10000 iterations
+        if t % 20000 == 0:
+            saver.save(sess, settings.model_dir + "/" + settings.acn_name + "/" + settings.game + "-acn", global_step=t)
 
 
 def playGame():
