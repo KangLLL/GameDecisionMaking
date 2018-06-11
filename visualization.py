@@ -34,15 +34,15 @@ def read_evaluation_data(algo):
     return score
 
 
-def scatter_plot(algo):
+def scatter_plot(algo, num):
     train_data = read_train_data(algo)
     eval_data = read_evaluation_data(algo)
 
     plt.scatter(range(1, len(train_data)+1) ,train_data, marker='.', label='Training')
-    plt.plot(range(0, len(train_data)+1, NUM_10000) , eval_data, color='r', linewidth=2.5, label='Evaluation')
+    plt.plot(range(0, len(eval_data)*num, num) , eval_data, color='r', linewidth=2.5, label='Evaluation')
     plt.plot([0, len(train_data),], [BASE_LINE, BASE_LINE,], 'k--', color='black', linewidth=2.5, label='Goal 150')
 
-    plt.title('Q Learning')
+    plt.title('Q Learning Double Pipes')
     plt.xlabel('Episode')
     plt.ylabel('Score')
     plt.legend()
@@ -86,11 +86,11 @@ def dqn_plot(algo):
 
 if __name__ == '__main__':
     # q_learning & sarsa scatter plot
-    algo = "q_learning"
-    scatter_plot(algo)
+    algo = "q_learning_double"
+    scatter_plot(algo, NUM_1000)
 
-    # compare q_learning methods
-    display_plot()
-
-    # dqn
-    dqn_plot('dqn')
+    # # compare q_learning methods
+    # display_plot()
+    #
+    # # dqn
+    # dqn_plot('dqn')
