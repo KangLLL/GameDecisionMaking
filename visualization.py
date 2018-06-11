@@ -5,8 +5,8 @@ Q_LEARNING_5 = 'q_learning_5'
 Q_LEARNING_10 = 'q_learning_10'
 Q_LEARNING_DOUBLE = 'q_learning_double'
 NUM_1000 = 1000
-NUM_2000 = 2000
 NUM_10000 = 10000
+NUM_20000 = 20000
 BASE_LINE = 150
 
 
@@ -42,7 +42,7 @@ def scatter_plot(algo, num):
     plt.plot(range(0, len(eval_data)*num, num) , eval_data, color='r', linewidth=2.5, label='Evaluation')
     plt.plot([0, len(train_data),], [BASE_LINE, BASE_LINE,], 'k--', color='black', linewidth=2.5, label='Goal 150')
 
-    plt.title('Q Learning Double Pipes')
+    plt.title('Q Learning 10 * 10')
     plt.xlabel('Episode')
     plt.ylabel('Score')
     plt.legend()
@@ -71,11 +71,11 @@ def display_plot():
     plt.show()
 
 
-def dqn_plot(algo):
+def dqn_plot(algo, num):
     eval_data = read_evaluation_data(algo)
 
-    plt.plot(range(0, len(eval_data)*NUM_2000, NUM_2000) , eval_data, color='r', linewidth=2.5, label='Evaluation')
-    plt.plot([0, len(eval_data)*NUM_2000,], [BASE_LINE, BASE_LINE,], 'k--', color='black', linewidth=2.5, label='Goal 150')
+    plt.plot(range(0, len(eval_data)*num, num) , eval_data, color='r', linewidth=2.5, label='Evaluation')
+    plt.plot([0, len(eval_data)*num,], [BASE_LINE, BASE_LINE,], 'k--', color='black', linewidth=2.5, label='Goal 150')
 
     plt.title('DQN')
     plt.xlabel('Update')
@@ -86,11 +86,11 @@ def dqn_plot(algo):
 
 if __name__ == '__main__':
     # q_learning & sarsa scatter plot
-    algo = "q_learning_double"
-    scatter_plot(algo, NUM_1000)
+    # algo = "q_learning_10"
+    # scatter_plot(algo, NUM_1000)
 
     # # compare q_learning methods
     # display_plot()
     #
     # # dqn
-    # dqn_plot('dqn')
+    dqn_plot('dqn', NUM_20000)
