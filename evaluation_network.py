@@ -9,8 +9,6 @@ import deep_q_network as dqn
 import deep_q_network_l as dqn_l
 import actor_critic_network as acn
 
-from game_ac_network import GameACFFNetwork
-
 
 np.set_printoptions(threshold='nan')
 from game_state import GameState
@@ -30,8 +28,8 @@ def create_network(method):
         s, out, _ = dqn_l.createNetwork()
         result = (s, out)
     elif method == 3:
-        network = GameACFFNetwork(settings.action, 1, device="/cpu:0")
-        result = network
+        s_actor, out_actor, _, _ = acn.create_two_network()
+        result = (s_actor, out_actor)
 
     return result
 
@@ -45,12 +43,9 @@ def reset_network(sess, method, file_name):
 
 
 def choose_action(method, sess, agent, s_values):
-    if method == 0 or method == 1:
+    if method == 0 or method == 1 or method == 2:
         q_values = sess.run(agent[1], {agent[0]: [s_values]})[0]
         return np.argmax(q_values)
-    elif method == 2:
-        pi_, value_ = agent.run_policy_and_value(sess, s_values)
-        return np.random.choice(range(len(pi_)), p=pi_)
     return 0
 
 
@@ -143,7 +138,7 @@ def method_2_name(method):
     return settings.dqn_name if method == 0 else "l" if method == 1 else settings.acn_name
 
 if __name__ == '__main__':
-    method = 1  # 0: dpn 1: dqn-without-target 2:acn 3:a3c
+    method = 1  # 0: dpn 1: dqn-without-target 2:acn
     t_start = 10000
     t_end = 1000000
     if len(sys.argv) > 1:
