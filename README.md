@@ -1,7 +1,7 @@
 # GameDecisionMaking
 
 ## Final Project
-This project implementes the flappy bird with reinforcement learning.  
+This project trains an agent to play the flappy bird by using various reinforcement learning algorithms.  
 
 ## The main executable files:  
 * deep_q_network.py is implementation of DQN  
